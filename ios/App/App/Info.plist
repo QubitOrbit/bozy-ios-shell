@@ -66,5 +66,10 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>WKAppBoundDomains</key>
+	<array>
+		<string>app.bozy.ai</string>
+		<string>auth.bozy.ai</string>
+	</array>
 </dict>
 </plist>

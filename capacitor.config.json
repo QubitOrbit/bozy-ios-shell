@@ -3,6 +3,10 @@
   "appName": "Bozy",
   "webDir": "www",
   "server": {
-    "url": "https://app.bozy.ai"
+    "url": "https://app.bozy.ai",
+    "allowNavigation": ["auth.bozy.ai"]
+  },
+  "ios": {
+    "limitsNavigationsToAppBoundDomains": true
   }
 }
