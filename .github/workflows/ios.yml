@@ -1,9 +1,12 @@
 name: ios
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      simulator:
+        description: Run in the iOS simulator and capture screenshots (~15 macOS minutes)
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -33,7 +36,7 @@ jobs:
           path: build/Bozy-unsigned.ipa
 
   simulator:
-    if: github.event_name == 'workflow_dispatch'
+    if: inputs.simulator
     runs-on: macos-latest
     timeout-minutes: 25
     steps:
