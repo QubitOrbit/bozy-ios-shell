@@ -1,0 +1,8 @@
+{
+  "appId": "ai.bozy.app",
+  "appName": "Bozy",
+  "webDir": "www",
+  "server": {
+    "url": "https://app.bozy.ai"
+  }
+}
