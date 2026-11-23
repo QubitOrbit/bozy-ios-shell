@@ -89,6 +89,23 @@ jobs:
         with:
           xcode-version: latest-stable
       - run: npm ci && npx cap sync ios
+      - name: Install signing certificate and profile
+        env:
+          DIST_P12_B64: ${{ secrets.DIST_P12_B64 }}
+          DIST_P12_PASSWORD: ${{ secrets.DIST_P12_PASSWORD }}
+          PROFILE_B64: ${{ secrets.PROFILE_B64 }}
+        run: |
+          KC="$RUNNER_TEMP/signing.keychain-db"
+          KCPW=$(openssl rand -hex 16)
+          security create-keychain -p "$KCPW" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KCPW" "$KC"
+          printf '%s' "$DIST_P12_B64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          security import "$RUNNER_TEMP/dist.p12" -P "$DIST_P12_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KCPW" "$KC"
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          printf '%s' "$PROFILE_B64" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/bozy.mobileprovision"
       - name: Archive, sign and upload
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
@@ -98,10 +115,9 @@ jobs:
         run: |
           KEY="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
           printf '%s' "$ASC_KEY_P8" > "$KEY"
-          AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' -archivePath build/App.xcarchive archive \
-            DEVELOPMENT_TEAM="$TEAM_ID" CURRENT_PROJECT_VERSION=${{ github.run_number }} "${AUTH[@]}"
+            CURRENT_PROJECT_VERSION=${{ github.run_number }}
           cat > build/export.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -109,9 +125,12 @@ jobs:
             <key>method</key><string>app-store-connect</string>
             <key>destination</key><string>upload</string>
             <key>teamID</key><string>$TEAM_ID</string>
-            <key>signingStyle</key><string>automatic</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key><dict><key>ai.bozy.app</key><string>Bozy App Store</string></dict>
             <key>manageAppVersionAndBuildNumber</key><false/>
           </dict></plist>
           EOF
           xcodebuild -exportArchive -archivePath build/App.xcarchive -exportOptionsPlist build/export.plist \
-            -exportPath build/export "${AUTH[@]}"
+            -exportPath build/export -authenticationKeyPath "$KEY" \
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
